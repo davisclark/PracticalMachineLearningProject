@@ -1,0 +1,106 @@
+---
+title: "Practical Machine Learning"
+author: "Davis Clark"
+date: "Sunday, July 26, 2015"
+output: html_document
+---
+```{r, echo=FALSE}
+library(caret)
+library(rpart)
+library(randomForest)
+```
+
+```{r}
+testing <- read.csv("testing.csv")
+training <- read.csv("training.csv")
+```
+
+```{r functions}
+### Create feature elimination function
+elimFeatures <- function(df, vector, nzv) {
+        slim <- df[, -nzv]
+        for(v in 1:length(vector)) {
+                slim <- slim[, -grep(vector[v], names(slim))]
+        }
+        slim
+}
+
+### Create preprocessing function
+prep <- function(df, preObj, main) {
+        slim <- predict(preObj, df[,-grep(main, names(df))])
+        slim[,main] <- df[,main]
+        slim
+}
+```
+
+## Building the algorithm
+```{r partition}
+### Set seed to day I was born
+set.seed(5251990)
+
+### Create test set to validate algorithm before official application
+intrain<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+train<-training[intrain,]
+test<-training[-intrain,]
+```
+
+```{r feature elimination}
+### Perform near zero variance analysis and remove useless features
+nzv <- nearZeroVar(train)
+metrics <- c("avg", "stddev", "var", "max", "min", "amplitude", "timestamp","window", "X", "user")
+
+train <- elimFeatures(train, metrics, nzv)
+test <- elimFeatures(test, metrics, nzv)
+```
+
+```{r preprocessing}
+### Preprocessing the training and test sets
+### Create preprocessing object
+preObj <- preProcess(train[,-grep("classe", names(train))],method=c("center","scale"))
+
+### Preprocess datasets
+train <- prep(train, preObj, "classe")
+test <- prep(test, preObj, "classe")
+```
+
+```{r attach modFit, echo=FALSE}
+attach("modFit")
+```
+
+```{r random forests, eval=FALSE}
+### Run random forests prediction algorithm
+modFit <- train(classe ~ ., data=train, method="rf")
+```
+```{r}
+summary(modFit)
+modFit
+modFit$finalModel
+```
+
+```{r predictions}
+### Apply prediction model to test set
+pred <- predict(modFit, test)
+test$predRight <- pred==test$classe
+table(pred, test$classe)
+```
+
+```{r correlation analysis, echo=FALSE}
+### Correlation Analysis
+# MM <- abs(cor(train))
+# diag(MM) <- 0
+# mm <- which(MM > 0.8, arr.ind = TRUE)
+```
+
+```{r predict problem set, echo=FALSE}
+### Predicting data from problem set
+# testing1 <- testing
+# testing1 <- elimFeatures(test1, metrics, nzv)
+# testing1 <- prep(testing1, preObj, "problem_id")
+# prediction1 <- predict(modFit, testing1)
+# table(prediction1)
+```
+
+## Estimating an out of sample error
+
+
+
