@@ -8,7 +8,6 @@ output: html_document
 library(caret)
 library(rpart)
 library(randomForest)
-library(data.table)
 ```
 As always, before one sets out to build anything, one must gather the required materials and prepare their workspace:
 
@@ -84,37 +83,41 @@ test <- prep(test, preObj, "classe")
 ```
 
 ```{r attach modFit, echo=FALSE}
-attach("./objects/modFit")
+attach("./objects/modFit1")
 ```
 
-And finally we create our prediction model by running a randomforests prediction algorithm on our clean and processed training set. 
+And finally we create our prediction model by running a randomforests prediction algorithm with cross validation on our clean and processed training set. 
 
 ```{r random forests, eval=FALSE}
 ### Run random forests prediction algorithm
-modFit <- train(classe ~ ., data=train, method="rf")
+modFit <- train(classe ~ ., data=train, method="rf", 
+                trControl = trainControl(method = "cv", 
+                                         number = 4, 
+                                         allowParallel = TRUE, 
+                                         verboseIter = TRUE))
 ```
 
 ## Final prediction model and out of sample error
 ```{r}
-modFit
-modFit$finalModel
+modFit1
+modFit1$finalModel
 ```
-As we can see, our expected out of sample error rate, using random forests, is approximately 0.76%. We can calculate this ourselves, by dividing the sum of our incorrect predictions `sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion))` by the sum of our correct predictions `sum(diag(modFit$finalModel$confusion))`:
+As we can see, our expected out of sample error rate, using random forests, is approximately 0.74%. We can calculate this ourselves, by dividing the sum of our incorrect predictions `sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion))` by the sum of our correct predictions `sum(diag(modFit$finalModel$confusion))`:
 
 ```{r, echo=FALSE}
-(sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion)))/sum(diag(modFit$finalModel$confusion))
+(sum(modFit1$finalModel$confusion)-sum(diag(modFit1$finalModel$confusion)))/sum(diag(modFit1$finalModel$confusion))
 ```
 
 We apply our model out of sample, using the test subset we set aside at the beginning of our routine.
 
 ```{r predictions}
 ### Apply prediction model to test set
-pred <- predict(modFit, test)
+pred <- predict(modFit1, test)
 test$predRight <- pred==test$classe
 table(pred, test$classe)
 (sum(table(pred, test$classe))-sum(diag(table(pred, test$classe))))/sum(diag(table(pred, test$classe)))
 ```
-The error rate we obtain in our test sample is 0.82%. Not bad. 
+The error rate we obtain in our test sample is 0.77%. Not bad. 
 ```{r correlation analysis, echo=FALSE}
 ### Correlation Analysis
 # MM <- abs(cor(train))

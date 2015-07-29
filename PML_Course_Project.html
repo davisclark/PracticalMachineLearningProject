@@ -134,13 +134,17 @@ preObj &lt;- preProcess(train[,-grep(&quot;classe&quot;, names(train))],method=c
 ### Preprocess datasets
 train &lt;- prep(train, preObj, &quot;classe&quot;)
 test &lt;- prep(test, preObj, &quot;classe&quot;)</code></pre>
-<p>And finally we create our prediction model by running a randomforests prediction algorithm on our clean and processed training set.</p>
+<p>And finally we create our prediction model by running a randomforests prediction algorithm with cross validation on our clean and processed training set.</p>
 <pre class="r"><code>### Run random forests prediction algorithm
-modFit &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;)</code></pre>
+modFit &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;, 
+                trControl = trainControl(method = &quot;cv&quot;, 
+                                         number = 4, 
+                                         allowParallel = TRUE, 
+                                         verboseIter = TRUE))</code></pre>
 </div>
 <div id="final-prediction-model-and-out-of-sample-error" class="section level2">
 <h2>Final prediction model and out of sample error</h2>
-<pre class="r"><code>modFit</code></pre>
+<pre class="r"><code>modFit1</code></pre>
 <pre><code>## Random Forest 
 ## 
 ## 13737 samples
@@ -148,20 +152,20 @@ modFit &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;)</code></pre>
 ##     5 classes: 'A', 'B', 'C', 'D', 'E' 
 ## 
 ## No pre-processing
-## Resampling: Bootstrapped (25 reps) 
+## Resampling: Cross-Validated (4 fold) 
 ## 
-## Summary of sample sizes: 13737, 13737, 13737, 13737, 13737, 13737, ... 
+## Summary of sample sizes: 10303, 10303, 10303, 10302 
 ## 
 ## Resampling results across tuning parameters:
 ## 
 ##   mtry  Accuracy   Kappa      Accuracy SD  Kappa SD   
-##    2    0.9888171  0.9858474  0.001906702  0.002403898
-##   27    0.9886483  0.9856328  0.001609398  0.002040953
-##   52    0.9780633  0.9722341  0.003616059  0.004578400
+##    2    0.9906095  0.9881191  0.001920936  0.002430315
+##   27    0.9884984  0.9854495  0.002196812  0.002779071
+##   52    0.9820923  0.9773422  0.001995182  0.002526210
 ## 
 ## Accuracy was used to select the optimal model using  the largest value.
 ## The final value used for the model was mtry = 2.</code></pre>
-<pre class="r"><code>modFit$finalModel</code></pre>
+<pre class="r"><code>modFit1$finalModel</code></pre>
 <pre><code>## 
 ## Call:
 ##  randomForest(x = x, y = y, mtry = param$mtry) 
@@ -169,31 +173,31 @@ modFit &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;)</code></pre>
 ##                      Number of trees: 500
 ## No. of variables tried at each split: 2
 ## 
-##         OOB estimate of  error rate: 0.76%
+##         OOB estimate of  error rate: 0.74%
 ## Confusion matrix:
 ##      A    B    C    D    E  class.error
 ## A 3903    2    0    0    1 0.0007680492
-## B   18 2632    8    0    0 0.0097817908
-## C    0   19 2374    3    0 0.0091819699
-## D    0    0   46 2204    2 0.0213143872
-## E    0    0    2    4 2519 0.0023762376</code></pre>
-<p>As we can see, our expected out of sample error rate, using random forests, is approximately 0.76%. We can calculate this ourselves, by dividing the sum of our incorrect predictions <code>sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion))</code> by the sum of our correct predictions <code>sum(diag(modFit$finalModel$confusion))</code>:</p>
-<pre><code>## [1] 0.00770565</code></pre>
+## B   18 2635    5    0    0 0.0086531226
+## C    1   19 2373    3    0 0.0095993322
+## D    0    0   46 2205    1 0.0208703375
+## E    0    0    1    4 2520 0.0019801980</code></pre>
+<p>As we can see, our expected out of sample error rate, using random forests, is approximately 0.74%. We can calculate this ourselves, by dividing the sum of our incorrect predictions <code>sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion))</code> by the sum of our correct predictions <code>sum(diag(modFit$finalModel$confusion))</code>:</p>
+<pre><code>## [1] 0.007409935</code></pre>
 <p>We apply our model out of sample, using the test subset we set aside at the beginning of our routine.</p>
 <pre class="r"><code>### Apply prediction model to test set
-pred &lt;- predict(modFit, test)
+pred &lt;- predict(modFit1, test)
 test$predRight &lt;- pred==test$classe
 table(pred, test$classe)</code></pre>
 <pre><code>##     
 ## pred    A    B    C    D    E
-##    A 1674   11    0    0    0
-##    B    0 1125   11    0    0
-##    C    0    3 1015   19    0
-##    D    0    0    0  945    4
-##    E    0    0    0    0 1078</code></pre>
+##    A 1674    8    0    0    0
+##    B    0 1128   10    0    0
+##    C    0    3 1016   20    0
+##    D    0    0    0  943    3
+##    E    0    0    0    1 1079</code></pre>
 <pre class="r"><code>(sum(table(pred, test$classe))-sum(diag(table(pred, test$classe))))/sum(diag(table(pred, test$classe)))</code></pre>
-<pre><code>## [1] 0.008223402</code></pre>
-<p>The error rate we obtain in our test sample is 0.82%. Not bad.</p>
+<pre><code>## [1] 0.007705479</code></pre>
+<p>The error rate we obtain in our test sample is 0.77%. Not bad.</p>
 </div>
 
 
