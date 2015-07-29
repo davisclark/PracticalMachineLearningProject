@@ -4,16 +4,38 @@ author: "Davis Clark"
 date: "Sunday, July 26, 2015"
 output: html_document
 ---
-```{r, echo=FALSE}
+```{r, echo=FALSE, message=FALSE}
 library(caret)
 library(rpart)
 library(randomForest)
+library(data.table)
 ```
+As always, before one sets out to build anything, one must gather the required materials and prepare their workspace:
 
+We read in the datasets we seek to analyze: 
 ```{r}
-testing <- read.csv("testing.csv")
-training <- read.csv("training.csv")
+testing <- read.csv("data/testing.csv")
+training <- read.csv("data/training.csv")
 ```
+Set the seed for reproducible results: 
+```{r partition}
+### Set seed to day I was born
+set.seed(5251990)
+```
+And partition the training dataset to create a subset for preliminary testing:
+```{r}
+### Create test set to validate algorithm before official application
+intrain<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+train<-training[intrain,]
+test<-training[-intrain,]
+```
+## Building the algorithm
+
+The following two functions are used to clean and process our dataset into a form more appropriate for algorithmic analysis. 
+
+The first function takes a dataframe, a vector of specific feature names we would like removed, and a numeric vector, resulting from the near zero variance analysis to be performed shortly. 
+
+The second function implements a simple process for applying a preprocessing object tuned to a training on other test sets. 
 
 ```{r functions}
 ### Create feature elimination function
@@ -33,16 +55,7 @@ prep <- function(df, preObj, main) {
 }
 ```
 
-## Building the algorithm
-```{r partition}
-### Set seed to day I was born
-set.seed(5251990)
-
-### Create test set to validate algorithm before official application
-intrain<-createDataPartition(y=training$classe,p=0.7,list=FALSE)
-train<-training[intrain,]
-test<-training[-intrain,]
-```
+We use the `nearZeroVar()` function found in the caret package to identify lame, useless features, void of any predictive variablity. We also specify the remaining features that we suspect will be of little use in our prediction model. Then, we run our previously defined `elimFeatures()` function, making use of both `nzv` and `metrics`. 
 
 ```{r feature elimination}
 ### Perform near zero variance analysis and remove useless features
@@ -52,6 +65,13 @@ metrics <- c("avg", "stddev", "var", "max", "min", "amplitude", "timestamp","win
 train <- elimFeatures(train, metrics, nzv)
 test <- elimFeatures(test, metrics, nzv)
 ```
+
+We'll use the following 52 predictors to build a prediction model on classe:
+```{r}
+names(train)
+```
+
+We tune our preprocessing object on the training set and use our `prep()` function to run it on out test set. 
 
 ```{r preprocessing}
 ### Preprocessing the training and test sets
@@ -64,26 +84,37 @@ test <- prep(test, preObj, "classe")
 ```
 
 ```{r attach modFit, echo=FALSE}
-attach("modFit")
+attach("./objects/modFit")
 ```
+
+And finally we create our prediction model by running a randomforests prediction algorithm on our clean and processed training set. 
 
 ```{r random forests, eval=FALSE}
 ### Run random forests prediction algorithm
 modFit <- train(classe ~ ., data=train, method="rf")
 ```
+
+## Final prediction model and out of sample error
 ```{r}
-summary(modFit)
 modFit
 modFit$finalModel
 ```
+As we can see, our expected out of sample error rate, using random forests, is approximately 0.76%. We can calculate this ourselves, by dividing the sum of our incorrect predictions `sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion))` by the sum of our correct predictions `sum(diag(modFit$finalModel$confusion))`:
+
+```{r, echo=FALSE}
+(sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion)))/sum(diag(modFit$finalModel$confusion))
+```
+
+We apply our model out of sample, using the test subset we set aside at the beginning of our routine.
 
 ```{r predictions}
 ### Apply prediction model to test set
 pred <- predict(modFit, test)
 test$predRight <- pred==test$classe
 table(pred, test$classe)
+(sum(table(pred, test$classe))-sum(diag(table(pred, test$classe))))/sum(diag(table(pred, test$classe)))
 ```
-
+The error rate we obtain in our test sample is 0.82%. Not bad. 
 ```{r correlation analysis, echo=FALSE}
 ### Correlation Analysis
 # MM <- abs(cor(train))
@@ -99,8 +130,5 @@ table(pred, test$classe)
 # prediction1 <- predict(modFit, testing1)
 # table(prediction1)
 ```
-
-## Estimating an out of sample error
-
 
 

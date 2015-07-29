@@ -67,12 +67,23 @@ img {
 </div>
 
 
-<pre><code>## Loading required package: lattice
-## Loading required package: ggplot2
-## randomForest 4.6-10
-## Type rfNews() to see new features/changes/bug fixes.</code></pre>
-<pre class="r"><code>testing &lt;- read.csv(&quot;testing.csv&quot;)
-training &lt;- read.csv(&quot;training.csv&quot;)</code></pre>
+<p>As always, before one sets out to build anything, one must gather the required materials and prepare their workspace:</p>
+<p>We read in the datasets we seek to analyze:</p>
+<pre class="r"><code>testing &lt;- read.csv(&quot;data/testing.csv&quot;)
+training &lt;- read.csv(&quot;data/training.csv&quot;)</code></pre>
+<p>Set the seed for reproducible results:</p>
+<pre class="r"><code>### Set seed to day I was born
+set.seed(5251990)</code></pre>
+<p>And partition the training dataset to create a subset for preliminary testing:</p>
+<pre class="r"><code>### Create test set to validate algorithm before official application
+intrain&lt;-createDataPartition(y=training$classe,p=0.7,list=FALSE)
+train&lt;-training[intrain,]
+test&lt;-training[-intrain,]</code></pre>
+<div id="building-the-algorithm" class="section level2">
+<h2>Building the algorithm</h2>
+<p>The following two functions are used to clean and process our dataset into a form more appropriate for algorithmic analysis.</p>
+<p>The first function takes a dataframe, a vector of specific feature names we would like removed, and a numeric vector, resulting from the near zero variance analysis to be performed shortly.</p>
+<p>The second function implements a simple process for applying a preprocessing object tuned to a training on other test sets.</p>
 <pre class="r"><code>### Create feature elimination function
 elimFeatures &lt;- function(df, vector, nzv) {
         slim &lt;- df[, -nzv]
@@ -88,21 +99,34 @@ prep &lt;- function(df, preObj, main) {
         slim[,main] &lt;- df[,main]
         slim
 }</code></pre>
-<div id="building-the-algorithm" class="section level2">
-<h2>Building the algorithm</h2>
-<pre class="r"><code>### Set seed to day I was born
-set.seed(5251990)
-
-### Create test set to validate algorithm before official application
-intrain&lt;-createDataPartition(y=training$classe,p=0.7,list=FALSE)
-train&lt;-training[intrain,]
-test&lt;-training[-intrain,]</code></pre>
+<p>We use the <code>nearZeroVar()</code> function found in the caret package to identify lame, useless features, void of any predictive variablity. We also specify the remaining features that we suspect will be of little use in our prediction model. Then, we run our previously defined <code>elimFeatures()</code> function, making use of both <code>nzv</code> and <code>metrics</code>.</p>
 <pre class="r"><code>### Perform near zero variance analysis and remove useless features
 nzv &lt;- nearZeroVar(train)
 metrics &lt;- c(&quot;avg&quot;, &quot;stddev&quot;, &quot;var&quot;, &quot;max&quot;, &quot;min&quot;, &quot;amplitude&quot;, &quot;timestamp&quot;,&quot;window&quot;, &quot;X&quot;, &quot;user&quot;)
 
 train &lt;- elimFeatures(train, metrics, nzv)
 test &lt;- elimFeatures(test, metrics, nzv)</code></pre>
+<p>We’ll use the following 52 predictors to build a prediction model on classe:</p>
+<pre class="r"><code>names(train)</code></pre>
+<pre><code>##  [1] &quot;roll_belt&quot;            &quot;pitch_belt&quot;           &quot;yaw_belt&quot;            
+##  [4] &quot;total_accel_belt&quot;     &quot;gyros_belt_x&quot;         &quot;gyros_belt_y&quot;        
+##  [7] &quot;gyros_belt_z&quot;         &quot;accel_belt_x&quot;         &quot;accel_belt_y&quot;        
+## [10] &quot;accel_belt_z&quot;         &quot;magnet_belt_x&quot;        &quot;magnet_belt_y&quot;       
+## [13] &quot;magnet_belt_z&quot;        &quot;roll_arm&quot;             &quot;pitch_arm&quot;           
+## [16] &quot;yaw_arm&quot;              &quot;total_accel_arm&quot;      &quot;gyros_arm_x&quot;         
+## [19] &quot;gyros_arm_y&quot;          &quot;gyros_arm_z&quot;          &quot;accel_arm_x&quot;         
+## [22] &quot;accel_arm_y&quot;          &quot;accel_arm_z&quot;          &quot;magnet_arm_x&quot;        
+## [25] &quot;magnet_arm_y&quot;         &quot;magnet_arm_z&quot;         &quot;roll_dumbbell&quot;       
+## [28] &quot;pitch_dumbbell&quot;       &quot;yaw_dumbbell&quot;         &quot;total_accel_dumbbell&quot;
+## [31] &quot;gyros_dumbbell_x&quot;     &quot;gyros_dumbbell_y&quot;     &quot;gyros_dumbbell_z&quot;    
+## [34] &quot;accel_dumbbell_x&quot;     &quot;accel_dumbbell_y&quot;     &quot;accel_dumbbell_z&quot;    
+## [37] &quot;magnet_dumbbell_x&quot;    &quot;magnet_dumbbell_y&quot;    &quot;magnet_dumbbell_z&quot;   
+## [40] &quot;roll_forearm&quot;         &quot;pitch_forearm&quot;        &quot;yaw_forearm&quot;         
+## [43] &quot;total_accel_forearm&quot;  &quot;gyros_forearm_x&quot;      &quot;gyros_forearm_y&quot;     
+## [46] &quot;gyros_forearm_z&quot;      &quot;accel_forearm_x&quot;      &quot;accel_forearm_y&quot;     
+## [49] &quot;accel_forearm_z&quot;      &quot;magnet_forearm_x&quot;     &quot;magnet_forearm_y&quot;    
+## [52] &quot;magnet_forearm_z&quot;     &quot;classe&quot;</code></pre>
+<p>We tune our preprocessing object on the training set and use our <code>prep()</code> function to run it on out test set.</p>
 <pre class="r"><code>### Preprocessing the training and test sets
 ### Create preprocessing object
 preObj &lt;- preProcess(train[,-grep(&quot;classe&quot;, names(train))],method=c(&quot;center&quot;,&quot;scale&quot;))
@@ -110,35 +134,12 @@ preObj &lt;- preProcess(train[,-grep(&quot;classe&quot;, names(train))],method=c
 ### Preprocess datasets
 train &lt;- prep(train, preObj, &quot;classe&quot;)
 test &lt;- prep(test, preObj, &quot;classe&quot;)</code></pre>
-<pre><code>## The following object is masked _by_ .GlobalEnv:
-## 
-##     modFit</code></pre>
+<p>And finally we create our prediction model by running a randomforests prediction algorithm on our clean and processed training set.</p>
 <pre class="r"><code>### Run random forests prediction algorithm
 modFit &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;)</code></pre>
-<pre class="r"><code>summary(modFit)</code></pre>
-<pre><code>##                 Length Class      Mode     
-## call                4  -none-     call     
-## type                1  -none-     character
-## predicted       13737  factor     numeric  
-## err.rate         3000  -none-     numeric  
-## confusion          30  -none-     numeric  
-## votes           68685  matrix     numeric  
-## oob.times       13737  -none-     numeric  
-## classes             5  -none-     character
-## importance         52  -none-     numeric  
-## importanceSD        0  -none-     NULL     
-## localImportance     0  -none-     NULL     
-## proximity           0  -none-     NULL     
-## ntree               1  -none-     numeric  
-## mtry                1  -none-     numeric  
-## forest             14  -none-     list     
-## y               13737  factor     numeric  
-## test                0  -none-     NULL     
-## inbag               0  -none-     NULL     
-## xNames             52  -none-     character
-## problemType         1  -none-     character
-## tuneValue           1  data.frame list     
-## obsLevels           5  -none-     character</code></pre>
+</div>
+<div id="final-prediction-model-and-out-of-sample-error" class="section level2">
+<h2>Final prediction model and out of sample error</h2>
 <pre class="r"><code>modFit</code></pre>
 <pre><code>## Random Forest 
 ## 
@@ -176,6 +177,9 @@ modFit &lt;- train(classe ~ ., data=train, method=&quot;rf&quot;)</code></pre>
 ## C    0   19 2374    3    0 0.0091819699
 ## D    0    0   46 2204    2 0.0213143872
 ## E    0    0    2    4 2519 0.0023762376</code></pre>
+<p>As we can see, our expected out of sample error rate, using random forests, is approximately 0.76%. We can calculate this ourselves, by dividing the sum of our incorrect predictions <code>sum(modFit$finalModel$confusion)-sum(diag(modFit$finalModel$confusion))</code> by the sum of our correct predictions <code>sum(diag(modFit$finalModel$confusion))</code>:</p>
+<pre><code>## [1] 0.00770565</code></pre>
+<p>We apply our model out of sample, using the test subset we set aside at the beginning of our routine.</p>
 <pre class="r"><code>### Apply prediction model to test set
 pred &lt;- predict(modFit, test)
 test$predRight &lt;- pred==test$classe
@@ -187,9 +191,9 @@ table(pred, test$classe)</code></pre>
 ##    C    0    3 1015   19    0
 ##    D    0    0    0  945    4
 ##    E    0    0    0    0 1078</code></pre>
-</div>
-<div id="estimating-an-out-of-sample-error" class="section level2">
-<h2>Estimating an out of sample error</h2>
+<pre class="r"><code>(sum(table(pred, test$classe))-sum(diag(table(pred, test$classe))))/sum(diag(table(pred, test$classe)))</code></pre>
+<pre><code>## [1] 0.008223402</code></pre>
+<p>The error rate we obtain in our test sample is 0.82%. Not bad.</p>
 </div>
 
 
